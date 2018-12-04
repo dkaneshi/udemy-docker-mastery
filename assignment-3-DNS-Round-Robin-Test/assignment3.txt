@@ -1,0 +1,17 @@
+# DNS round robin - you can have two or more hosts that have the same DNS alias so that they respond to the same DNS name
+
+# Create a new virtual network using the default bridge driver
+docker network create round_robin
+
+# Create two containers from elasticserch:2 image
+# Resarch and use the '--net-alias search' when creating the containers to give them an additional DNS name to respond to
+# run this twice
+docker container run -d --rm --network round_robin --net-alias search elasticsearch:2
+
+
+# Run the 'alpine nslookup search' with '--net' set to the same network that you assigned to the two containers.
+docker container run --rm --net round_robin alpine nslookup search
+
+# After you have the two containers resolving to the same alias 
+# Run the 'centos curl -s search:9200' with the '--net' multiple times until you see both "name" fields show
+docker container run -it --rm --network round_robin centos curl -s search:9200

@@ -1,0 +1,425 @@
+# run an interactive container with a command
+docker container run -it --name <container_name> <container_image> <command>
+
+# EXAMPLE: run docker with a shell  (use the -it option and the bash command)
+docker container run -it --name proxy nginx bash
+
+# NOTE: type exit in the container's interactive shell to get out of the container but will also stop/close the container.
+
+# NOTE: when running a container and specifying a command, the container will only run until the command completes.
+
+# run ubuntu into it's shell
+docker container run -it --name ubuntu ubuntu
+
+# to start a container's shell that has already stopped
+docker container start -ai <container_name>
+
+# to run a command on a container that is already running you use the container exec command.
+docker container exec -it <container_name> <command>
+
+# EXAMPLE: below will open the bash shell on our already running mysql container
+docker container exec -it mysql bash
+
+# NOTE: when exiting a command/shell of a container that was started using the container exec command the container remains running.
+
+# Pull an image without creating a container
+docker pull <image_name>
+
+# EXAMPLE
+docker pull alpine
+
+# show all images that are on your machine
+docker image ls
+
+# NOTE: You can only run commands on a container if the image contains that command/program or if you had previously installed it on 
+# the container
+
+# EXAMPLE: the following will fail because bash is not installed on the alpine image
+docker container run -it --name alpine alpine bash
+
+##################
+DOCKER NETWORKING
+##################
+
+# NOTE: Each container is connected to a private virtual network "bridge"
+
+# NOTE: Each virtual network routes through NAT firewall on host IP to get to the internet
+
+# NOTE: All containers on the same virutal network can talk to each other without -p/--publish
+#   - don't use the -p option when we want specific containers to talk to each other 
+
+# IMPORTANT: Best practice ist to create a new virtual network for each app
+#   - network "my_web_app" for mysql and php/apache containers
+#   - network "my_api" for mongo and nodejs containers
+
+# NOTE: containers can talk to more than one virtual network (or none)
+
+# NOTE: Use different Docker network drivers to gain new abilities
+
+# Explain -p option
+docker container run -p <host_port>:<container_port> --name <container_name> -d <image_name>
+
+# Show which port is forwarding traffic from host to container
+docker container port <container_name>
+
+# NOTE: By default the container does not have the same IP as the host.
+
+# Get the IP of the container (user the container inspect command and format the output using the --format option to filter on the json attribute you want)
+docker container inspect --format '{{ .NetworkSettings.IPAddress }}' <container_name>
+
+###################
+
+# IMPORTANT: The nginx image no longer has Ping installed.  If you need to use Ping use the image called nginx:alpine instead.
+
+# show all the networks that have been created
+docker network ls
+
+# NOTE: The bridge network is the default docker virtual network, which is NAT'ed behind the Host IP.
+
+# show info about a virtual network (returns json)
+docker network inspect <network_name>
+
+# EXAMPLE: See the containers connected to the bridge network
+docker network inspect bridge
+
+# NOTE: The host virtual network skips the bridge network and attaches containers straight to host IP.
+
+# NOTE:  We can create our own virtual networks
+docker network create <network_name>
+
+# EXAMPLE (the default network driver given to our new network is 'bridge')
+docker network create my_app_net
+
+# EXAMPLE create a container that connects to our my_app_net virtual network instead of the default bridge network.
+docker container run -d --name new_nginx --network my_app_net nginx:alpine
+
+# NOTE: we can connect existing containers to a new network
+
+# EXAMPLE: we connect the existing webhost container to the my_new_app network
+docker netwok connect my_new_app webhost
+
+# then use the container inspect command to verify the connection to two networks
+docker network inspect webhost
+
+# EXAMPLE: disconnect the webhost container from the my_new_app network
+docker netwok disconnect my_new_app webhost
+
+#################
+Docker Networks: DNS
+#################
+
+# IMPORTANT: Static IP's and using IP's for talking to containers is an anti-pattern. Do your best to avoid it.
+
+# NOTE: You can't rely on IP addresses for containers to talk to each other because of how dynamically containers spin up and spin down.
+# NOTE: Docker uses the container name as the hostname for the 'server'
+# NOTE: Containers can talk to other containers on the same network using their container names.
+
+# EXAMPLE: create a new container attach it to the my_app_net network
+docker container run -d --name my_nginx --network my_app_net nginx:alpine
+# now ping the new_nginx container from the my_nginx container
+docker container exec -it my_nginx ping new_nginx
+
+# IMPORTANT: the default bridge network named 'bridge' does not have the DNS server built-in by default.
+
+
+################
+DOCKER images
+################
+
+# NOTE: Images are defined using the union file system (UFS).
+
+# NOTE: Images are made up of file system changes and metadata 
+
+# NOTE: Each layer is uniquely identified by a a SHA and only stored once on a host.
+#       Which saves space on the host and transfer time on push/pull
+
+# NOTE: A container is just a single read/write layer on top of image.
+
+# show a list of images you have on your machine
+docker image ls
+
+# show a history of the image layers
+docker image history <image_name>:<image_tag>
+
+# EXAMPLE: show history for the 'nginx' image with the 'latest' tag
+docker image history nginx:latest
+
+# NOTE: The first layer is call 'scratch', every change to the image after the first 'scratch' becomes its own layer.
+
+# NOTE: 'Copy on Write'
+
+# NOTE: the 'image inspect' command gives you back the meta-data about that image in json format
+docker image inspect <image_name>
+
+# EXAMPLE
+docker image inspect nginx
+
+################
+DOCKER Image Tags
+################
+
+# NOTE: A tag is a pointer to a specific image commit.
+# NOTE: Multiple tags can be for the same image id.
+
+# NOTE: The 'TAG' called 'latest' doesn't necessarily mean it is the latest build of the image. 
+#       The 'latest' tag name is the default tag name given when you don't specify a tag when using the 
+#       'docker image tag' command. But it is usually assumed that the 'latest' tag is the latest version 
+#       of the image.
+
+# NOTE: When you create a new image you must make sure to use <username_or_organization_name>/<image_name>
+
+# NOTE: You can push images that you tag up to Docker Hub using the following command.
+#       'docker image push'
+#       You must be logged into Docker Hub using the 'docker login' command before you can push.
+#       Use 'docker logout' if you're done.
+#       If you want to push your image to a private Docker Hub repository, create the private repo first.
+
+#############
+Dockerfile Basics
+#############
+
+# NOTE: Dockerfiles are recipes for your image.
+
+# NOTE: See example Dockerfile in the dockerfile-sample-1 folder.
+
+# NOTE: Use the following command to build an image from your Dockerfile
+docker image build -t <image_name> <path_to_your_Dockerfile>
+
+# EXAMPLE: Switch to the dockerfile-sample-1 folder first. Will build an image based on the Dockerfile 
+#          within the current directory (.) that you are in.
+docker image build -t customnginx .
+
+#############
+Dockerfile: Extending official images
+#############
+
+# NOTE: See example Dockerfile in dockerfile-sample-2 folder.
+
+# NOTE: The COPY command in the Dockerfile is used to copy your application source code to the working directory.
+
+# EXAMPLE: Switch to the dockerfile-sample-2 folder first. Builds the image defined in the Dockerfile with the custom index.html file.
+docker image build -t nginx-with-html .
+
+#############
+Container Lifetime & Persistent data
+#############
+
+# NOTE: Containers are meant to be immutable (unchanging) and ephemeral (temporary)
+# NOTE: Your container shouldn't contain your data with your application binaries. (separation of concerns)
+# NOTE: The container by default is persistent across restarts and reboots. 
+# NOTE: You only use the data within your container when you remove that container.
+# NOTE: Volumes and Bind Mounts get us around not having persistent data after removing a container.
+
+# NOTE: Volumes make a special location outside of container UFS.
+# NOTE: Bind mounts link container path to a host path
+
+############
+Volumes
+############
+
+# NOTE: One way you can tell a container that it needs to worry about a volume is in a Dockerfile.
+#       Use the 'VOLUME' command within the Dockerfile
+# NOTE: Any files you put in the container's volume will outlive the container until you manually delete the volumme.
+# NOTE: You can check where the location of the data in the container's volume is actually living on the host file system by doing 
+#       a 'docker container inspect' command and checking the 'Mounts' array in the json output.
+
+# EXAMPLE: view a list of volumes
+docker volume ls
+
+# NOTE: By default docker volume names are not user friendly.
+
+# EXAMPLE: inspect a volume
+docker volume inspect <volume_name>
+
+# NOTE: To give a more user friendly volume name you use 'named volumes'
+docker container run -v <user_friendly_name>:<volume_path_in_container> <image_name>
+
+# EXAMPLE: using named volume called 'mysql-db' to the '/var/lib/mysql' path in the container.
+docker container run -d --name mysql --env MYSQL_ALLOW_EMPTY_PASSWORD=True -v mysql-db:/var/lib/mysql mysql
+
+# IMPORTANT: You can reuse a previous container's named volume on a new container by reissuing the docker run command 
+#    with the same named volume and container path.
+
+# NOTE: You can create a named volume ahead of time by using the 'docker volume create' command.
+#       Using this command you can specify a drive and options. This command would be used for special cases.
+
+############
+Bind Mounts
+############
+
+# NOTE: A bind mount maps a host file directory to a container file directory. Basically just two locations point to the same 
+#       file(s).
+
+# NOTE: Great for development.
+
+# NOTE: Can't be used in a Dockerfile, must be used during 'container run' command call.
+docker container run -v <path_to_directory_on_host>:<path_in_container>
+
+# EXAMPLE: 
+docker container run -v /Users/dkaneshi/mystuff:/path/container (mac/linux)
+docker container run -v //c/Users/dkaneshi/mystuff:/path/container (windows)
+
+# EXAMPLE: '$(pwd)' is a shell command that inserts your current working directory
+docker container run -d --name nginx -p 80:80 -v $(pwd):/usr/share/nginx/html nginx
+
+
+############
+Docker Compose
+############
+
+# NOTE: Docker compose files are written in YAML
+
+# NOTE: There are multiple versions each one adding more features.
+
+# NOTE: YAML file can be used with 'docker-compose' command for total docker automation or with docker directly in prodoction with Swarm
+
+docker-compose --help
+
+# NOTE: The 'docker-compose.yml' file is the default filename, but any YAML filename can be used with the 'docker-compose -f' option.
+
+# NOTE: See the 'compose-sample-1' folder for a docker-compose template. The number of spaces used for indenting must be consistent.
+
+# NOTE: All the things we can do in the 'docker container run' command can be done in the docker-compose file. 
+#     This replaces having the need to use shell/batch scripts for your run commands.
+
+#############
+docker-compose CLI
+#############
+
+# NOTE: The CLI tool comes with the Docker installation for Mac/Windows, but separate for Linux.
+
+# NOTE: The CLI tool is not considered a production-grade tool but is ideal for local development and testing.
+
+# NOTE: Two most commonly used commands:
+#     docker-compose up       # setup volumes/netwoks and start all containers
+#     docker-compose down     # stop all containers and remove containers/volumes/networks
+
+# NOTE: If all your projects had a Dockerfile and docker-compose.yml then 'new developer onboarding' could be 
+#     'git clone github.com/some/software'
+#     'docker-compose up'
+
+# NOTE: See inside folder 'compose-sample-2' the 'docker-compose.yml' file for comments.
+
+# EXAMPLE: Running docker-compose in detached mode
+docker-compose up -d
+
+#############
+Adding Image Building to Compose Files
+#############
+
+# NOTE: Compose can build your custom images
+# NOTE: Will build them with the 'docker-compose up' command if not found in image cache
+# NOTE: You can also rebuild your image using the 'docker-compose build' command.
+# NOTE: Great for complex builds with lots of vars and build args
+
+# NOTE: See the 'compose-sample-3' directory for an example.
+
+#############
+Docker Swarm
+#############
+
+# NOTE: Built-in orchestration
+# NOTE: Swarm Mode is a clustering solution built inside Docker
+# NOTE: Swarm mode is not enabled out of the box. It needs to be enabled.
+
+# NOTE: Manager nodes they have a raft database stored locally that store configuration that give information they need to be a an authority inside a swarm.
+#       A worker with permissions to control the swarm.
+# NOTE: Worker nodes
+
+############
+Swarm Services
+############
+
+# NOTE: You can check if Swarm has been turned on by using the 'docker info' command.
+
+# EXAMPLE: Initialize a swarm, creates a single node swarm.
+docker swarm init
+
+# NOTE: The 'docker swarm init' command does lots of PKI and security automation.
+#       Root signing certificate is created for the Swarm.
+#       Certificate is issued for first Manager node.
+#       Join tokens are created.
+
+# NOTE: Raft consensus database created to store root CA, configs and secrets
+#       Encrypted by default on disk
+#       No need for another key/value system to hold orchestration/secrets
+#       Replicates logs amongst Managers via mutual TLS in "control plane"
+
+# EXAMPLE: Lists nodes in the swarm
+docker node ls
+
+# NOTE: There can only be one manager that is the leader.
+
+# NOTE: The 'doker service' in a Swarm replaces the 'docker run' command.
+
+# EXAMPLE: Start the alpine image and have it ping the IP 8.8.8.8 (a Google DNS server)
+docker service create alpine ping 8.8.8.8
+
+# NOTE: A service ID is returned, not a container ID, after running the 'docker service create' command.
+# NOTE: The 'docker service ls' command lists the services.
+# NOTE: The 'docker cervice ps <service_name>' command lists the task/containers for a service.
+
+# EXAMPLE: Scale up a service, changing the number of replicas to 3.
+docker service update <service_id> --replicas 3
+
+############
+Creating 3-Node Swarm
+############
+
+# NOTE: Host options
+#       A. play-with-docker.com
+#           - Only needs a browser, but resets after 4 hours
+#       B. docker-machine + VirtualBox
+#           - Free and runs locally, but requires a machine with 8 GB memory
+#       C. Digital Ocean + Docker install
+#           - Most like a production setup, but costs $5 - 10/node/month while learning
+#           - Use referral code in section resources to get $10 free
+
+# NOTE: Used play-with-docker.com
+
+# NOTE: Created 3 instances (node1, 2, 3)
+
+# NOTE: On node1 ran the command
+docker swarm init --advertise-addr <node1_ip_address>
+
+# NOTE: Copy the swarm join command
+docker swarm join --token SWMTKN-1-3nxc2ucujz2a9ba1x768fwfd42uw0ro86xmlattlqmmd2nf60i-6u0n41vcysbhq9a8hyf1660up 192.168.0.23:2377
+
+# NOTE: Paste and run the swarm join command on to node2.
+# NOTE: Jump back on node1 and run the command
+docker node ls
+
+# NOTE: You should see the other nodes.
+# IMPORTANT: You can only run the swarm commands on the swarm manager (node1) unless you promote the other nodes to a manager.
+
+# NOTE: To add a manager during the join use the following command to get a 'manager join token'.
+docker swarm join-token manager 
+
+# NOTE: Copy and paste the manager join token, then paste into node3
+docker swarm join --token SWMTKN-1-3nxc2ucujz2a9ba1x768fwfd42uw0ro86xmlattlqmmd2nf60i-5j1bu7eokdaklr321ktvj1xyu 192.168.0.23:2377
+
+# NOTE: To update a worker to a manager use the following command.
+docker node update --role manager node2
+
+# NOTE: Create 3 service replicas using node1 command line
+docker service create --replicas 3 alpine ping 8.8.8.8
+
+##########
+Scaling out with Overlay Networking
+##########
+
+# NOTE: Just choose --driver overlay when creating network
+docker network create --driver overlay <network_name>
+
+#########
+Routing Mesh
+#########
+
+# NOTE: Routes ingress (incoming) packets for a service to proper task
+# NOTE: Spans all nodes in swarm
+# NOTE: Uses IPVS from Linux Kernel
+# NOTE: Load balances Swarm Services across their tasks
+# NOTE: Two ways this works
+#       Container-to-container in a overlay network (uses VIP)
+#       External traffic incoming ot published ports (all nodes listen)
+

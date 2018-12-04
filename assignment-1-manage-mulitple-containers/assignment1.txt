@@ -1,0 +1,40 @@
+# docker container run commands to create 3 containers based on the nginx, httpd (apache), mysql images.
+
+docker container run --publish 80:80 --detach --name nginxhost nginx
+
+docker container run --publish 8080:80 --detach --name apachehost httpd
+
+docker container run --publish 3306:3306 --detach --name mysqlhost --env MYSQL_RANDOM_ROOT_PASSWORD=yes mysql
+
+# alternative you can set a specific root password example below sets it to my-secret-pwd
+docker container run --publish 3306:3306 --detach --name mysqlhost --env MYSQL_ROOT_PASSWORD=my-secret-pwd mysql
+
+
+# confirm that the containers were created and are running
+
+docker container ls -a
+
+
+# Use the logs for mysqlhost to search for the random root password
+
+docker container logs mysqlhost
+
+
+# clean up the containers by stopping them and then removing them
+
+docker container stop nginxhost
+
+docker container rm nginxhost
+
+docker container stop apachehost
+
+docker container rm apachehost
+
+docker container stop mysqlhost
+
+docker container rm mysqlhost
+
+
+# confirm that the containers were removed
+
+docker container ls -a
